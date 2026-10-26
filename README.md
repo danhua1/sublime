@@ -13,9 +13,9 @@ Subline 是一个面向个人使用的原生 macOS 纯文本编辑器。当前�
 以下示例使用本机已有的 Xcode 14.2。`DEVELOPER_DIR` 只作用于它前面的那条命令；将其值改为你自己的 `Xcode.app/Contents/Developer` 路径即可。构建产物为忽略目录中的 `build/Subline.app`：
 
 ```sh
-DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" /usr/bin/xcrun swift build -c release --scratch-path .build
-DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" sh scripts/build-app.sh
-DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" sh scripts/verify-bundle.sh
+DEVELOPER_DIR="/Users/xxxx/Xcode.app/Contents/Developer" /usr/bin/xcrun swift build -c release --scratch-path .build
+DEVELOPER_DIR="/Users/xxxx/Xcode.app/Contents/Developer" sh scripts/build-app.sh
+DEVELOPER_DIR="/Users/xxxx/Xcode.app/Contents/Developer" sh scripts/verify-bundle.sh
 ```
 
 启动构建好的应用：
@@ -50,11 +50,11 @@ T001 不实现草稿恢复或应用偏好持久化，也不启用 macOS 窗口�
 ## 验证
 
 ```sh
-DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" /usr/bin/xcrun swift test --scratch-path .build
-DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" /usr/bin/xcrun swift build -c release --scratch-path .build
-DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" sh scripts/build-app.sh
-DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" sh scripts/verify-bundle.sh
-DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" sh scripts/smoke-app.sh
+DEVELOPER_DIR="/Users/xxxx/Xcode.app/Contents/Developer" /usr/bin/xcrun swift test --scratch-path .build
+DEVELOPER_DIR="/Users/xxxx/Xcode.app/Contents/Developer" /usr/bin/xcrun swift build -c release --scratch-path .build
+DEVELOPER_DIR="/Users/xxxx/Xcode.app/Contents/Developer" sh scripts/build-app.sh
+DEVELOPER_DIR="/Users/xxxx/Xcode.app/Contents/Developer" sh scripts/verify-bundle.sh
+DEVELOPER_DIR="/Users/xxxx/Xcode.app/Contents/Developer" sh scripts/smoke-app.sh
 ```
 
 实现阶段 attempt 3 的正式复验记录为 20 项 XCTest（0 failures）和 87 条 AppKit/文件冒烟断言；首轮 CLT 工具链失败、后续源码诊断与 Xcode 正式复验是不同阶段，当前验证环境与结果、测试隔离、文件/ACL/恢复限制及尚未完成的人工作业见 [`docs/TESTING.md`](docs/TESTING.md)。冒烟启动真实 AppKit 窗口，需图形会话和可用的 `sandbox-exec`；它使用新建临时根和系统沙箱，不重设 `HOME`。这些实现阶段结果尚待文档后工作流复验和独立审核。
