@@ -1,0 +1,13 @@
+(version 1)
+(allow default)
+; AppKit and panels may persist defaults even when the app uses volatile
+; defaults. Deny preference writes and reads of the real application domain.
+(deny user-preference-write)
+(deny user-preference-read (preference-domain "local.subline.editor"))
+; Everything this test writes must stay in the freshly created test root.
+; Frameworks may still read their SDK/system resources to create real windows.
+(deny file-write* (require-not (subpath (param "TEST_ROOT"))))
+(deny file-read-data
+    (literal (param "APP_PREFERENCES"))
+    (subpath (param "APP_RECOVERY"))
+    (subpath (param "APP_SAVED_STATE")))

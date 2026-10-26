@@ -1,90 +1,60 @@
-# JSON Flow
+# Subline
 
-一个无运行时依赖、无需后端的 JSON 格式化 / 压缩 / 校验网页工具。重点解决大文件计算阻塞主线程、完整文本编辑器卡顿、百万行 DOM 膨胀的问题。
+Subline 是一个面向个人使用的原生 macOS 纯文本编辑器。当前已实现多标签编辑、本地 UTF-8 文件打开与保存、撤销/重做，以及关闭时的未保存修改保护。应用使用 AppKit / NSTextView，不需要后端或第三方运行时依赖。
 
-## 启动
+## 环境要求
 
-需要 Node.js 20 或更新版本，无需 `npm install`：
+- macOS 12 或更新版本；当前构建产物为 Apple silicon（arm64）。
+- 本仓库已验证环境：macOS 12.5.1、Xcode 14.2、Apple Swift 5.7.2。
+- SwiftPM 需要可用的 Apple 工具链、macOS SDK、`PackageDescription` 和 XCTest。若系统选中的 Command Line Tools 缺少这些模块，请像下面示例一样为单条命令指定 Xcode；不必更改全局 `xcode-select`。
 
-```bash
-npm run dev
+## 构建和启动
+
+以下示例使用本机已有的 Xcode 14.2。`DEVELOPER_DIR` 只作用于它前面的那条命令；将其值改为你自己的 `Xcode.app/Contents/Developer` 路径即可。构建产物为忽略目录中的 `build/Subline.app`：
+
+```sh
+DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" /usr/bin/xcrun swift build -c release --scratch-path .build
+DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" sh scripts/build-app.sh
+DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" sh scripts/verify-bundle.sh
 ```
 
-访问 **http://localhost:3000**。可用 `PORT=4000 npm run dev` 修改端口。开发服务仅监听本机 `127.0.0.1`。
+启动构建好的应用：
 
-也可把 `index.html` 和 `src/` 部署到任意支持 JavaScript 模块的静态 HTTP(S) 服务器。不要直接双击 HTML：模块 Worker 需要 HTTP(S) 环境。剪贴板功能通常要求 HTTPS 或 localhost。
+```sh
+build/Subline.app/Contents/MacOS/Subline
+```
 
-## 功能
+`build-app.sh` 通过 `xcrun swift` 使用当前进程选择的开发目录构建 release，然后生成 app bundle；`verify-bundle.sh` 独立检查其 plist、可执行文件、arm64 架构、AppKit 依赖和最低系统版本。构建和验证不会执行全局 `xcode-select` 修改。
 
-- JSON 格式化：2 空格 / 4 空格 / Tab 缩进。
-- JSON 压缩：只删除字符串外部空白，不改写数据。
-- 严格语法校验，错误定位至原始输入的行、列。
-- 粘贴文本、拖入文件、选择文件；超过 1 Mi 字符的粘贴自动切换文件模式。
-- 可见行语法高亮、虚拟滚动、跳转行、完整下载、小结果复制。
-- `⌘ / Ctrl + Enter` 转换，`Escape` 取消。
-- 深浅主题、移动端布局、隐私优先，数据不上传、不持久化。
+## 当前编辑行为
 
-## 为什么大 JSON 不容易卡住
+下面列出当前版本已有的操作；尚未实现的编辑辅助功能不作为现有能力介绍。
 
-| 环节 | 实现 |
-| --- | --- |
-| 文件输入 | 主线程仅传递 File / Blob，Worker 按 **256 KiB** 读取；不使用 `file.text()` 整体读取大文件。 |
-| 解析与格式化 | Worker 中运行增量 JSON 语法状态机，不调用完整文档的 `JSON.parse` / `JSON.stringify`，不构建对象树。使用流式 UTF-8 解码处理跨块字符。 |
-| 输出 | 分块编码成 Blob，每块生成后释放临时字符串，避免拼接一条巨大的输出字符串。 |
-| 行索引 | 分页 Float64 字节偏移，每行约 8 字节，支持按行切片读取；索引保留在 Worker，不传给主线程。 |
-| 预览 | 只请求可见行及少量 overscan，每次最多 160 行、每行最多约 4 KiB；普通视口通常只有几十行 DOM。 |
-| 极多行滚动 | 原生滚动高度限制为 800 万像素，将逻辑行号映射到此范围；支持几百万行首尾跳转，不触发浏览器最大布局高度。 |
-| 取消 | 终止 Worker，直接释放处理中间数据，保留原始输入，下一次操作重新创建 Worker。核心算法也支持 AbortSignal。 |
-| 下载与复制 | 下载 Blob 对应的完整内容，不是预览片段。超过 8 MiB 禁用复制，避免剪贴板的大字符串分配。 |
+- 新建多个未命名标签；通过打开菜单/面板选择本地文件；重复打开同一路径时切回已有标签。
+- 保存、另存为、撤销/重做，以及关闭标签或退出时的保存、放弃、取消选择。
+- 菜单快捷键：⌘N 新建、⌘O 打开、⌘S 保存、⇧⌘S 另存为、⌘W 关闭标签、⌘Z 撤销、⇧⌘Z 重做、⌘Q 退出。
+- 编辑内容按纯文本处理。每个标签拥有独立文本与撤销状态；保存失败或取消不会清除未保存标记。
 
-**精度与语义：** 直接保留词法文本，包括大整数、`-0`、指数写法、转义、重复键、键顺序。不会因为 JavaScript Number 精度或键重排而改变原始数据。仅改变字符串之外的空白。保留重复键并不代表推荐使用重复键，下游 JSON 消费者可能只保留最后一个值。
+### 文件支持与保护
 
-**错误定位：** 行、列从 1 开始，换行以 LF 为准，列及字符偏移使用 UTF-16 code unit（与 JavaScript 文本索引一致）；不是字节偏移。输入的 UTF-8 BOM 可省略，输出不包含 BOM。
+- 只接受本地普通文件，文本须为严格 UTF-8；允许并保留 UTF-8 BOM。无效 UTF-8、UTF-16、含二进制控制字符的文件和目录会被拒绝。
+- 输入和保存结果上限均为 **20 MiB（20 × 1024 × 1024 字节）**。打开前检查文件大小，读取时也有界；上限用于防止超量输入，不代表性能承诺。
+- 编辑缓冲区统一使用 LF。打开文件时识别 LF、CRLF 或 CR，保存时沿用检测到的样式；混合行尾会统一为文件中最先出现的换行样式，无换行文件及新建文档使用 LF。已打开文件的 UTF-8 BOM 会保留。
+- 保存前会检查磁盘文件是否相对打开时发生变化。检测到外部修改或删除时取消覆盖并保留本地未保存内容；可另存到新路径。该保护不能消除其他非协作程序恰好在最终检查与替换之间写入的所有竞争风险。检测到目标有扩展 ACL（deny、grant、空或继承 ACL），或读取 ACL/访问属性失败时，会在替换前拒绝保存；特殊 mode bits、非零保护 flags 及带继承 ACL 的新临时文件也会拒绝。普通无 ACL 文件的 owner/group/mode 会应用并核对。不能安全原位保存时，请另存为新文件；错误路径不会清除本地未保存状态。
+- 文件读写是同步操作；20 MiB 限制不保证大文本操作没有延迟。
 
-## 边界与限制
+### 本地数据与恢复
 
-这不是磁盘级流式工具：**输出 Blob 和行索引仍占内存，内存使用与输出字节数和行数相关。** 移入 Worker 可以避免主线程计算卡顿，但并不能增加设备可用内存。
-
-- 输入文件上限 **256 MiB**；输出安全上限 **512 MiB**；嵌套上限 **512 层**。
-- 大量短行会让行索引占用明显内存；缩进也会扩大输出。低内存设备应拆分文件或选择压缩 / 仅校验模式。
-- 仅校验不保留输出或行索引，内存需求更低。
-- 超长行预览会明确显示省略标记，**下载结果始终完整**。预览中的文本选择只覆盖当前挂载的行，获取完整结果请复制或下载。
-- 超大文本粘贴仍需浏览器先接收剪贴板字符串，无法彻底消除这一步的分配开销；大文件优先使用“导入文件”。
-- UTF-8 编码，严格 JSON。不支持 JSON5、注释、单引号、尾随逗号或 NDJSON。
-- 不包含 JSON → YAML / CSV / XML 转换，也不支持对完整对象树编辑 / 排序；这是 JSON 的格式化与压缩工具。
-- 目标为支持模块 Worker、Blob、TextDecoder、ResizeObserver 的现代浏览器。已在本机无界面 Chrome 验证，未声称已覆盖所有浏览器。
+T001 不实现草稿恢复或应用偏好持久化，也不启用 macOS 窗口状态恢复。未保存内容只在当前进程和标签中；退出后不会自动恢复。关闭/退出前的未保存提示是当前的数据保护方式。当前实现不包含网络请求、遥测或内容上传。
 
 ## 验证
 
-```bash
-npm test                      # 零依赖 Node.js 自动化测试
-npm run benchmark -- 50        # 约 50 MiB 的可复现核心算法基准，参数范围 1–256
-npm run test:browser           # 需先启动服务；默认使用 macOS Chrome
+```sh
+DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" /usr/bin/xcrun swift test --scratch-path .build
+DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" /usr/bin/xcrun swift build -c release --scratch-path .build
+DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" sh scripts/build-app.sh
+DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" sh scripts/verify-bundle.sh
+DEVELOPER_DIR="/Users/dusiyuan/Downloads/Xcode.app/Contents/Developer" sh scripts/smoke-app.sh
 ```
 
-浏览器测试通过 Chrome DevTools Protocol 运行，无需 Playwright / Puppeteer。可通过 `CHROME_PATH` 和 `BASE_URL` 指定 Chrome 路径与测试服务地址；会创建临时浏览器配置与文件，结束时清理，截图保存在系统临时目录。
-
-测试覆盖跨字节 UTF-8、转义、所有 JSON 根类型、非法语法、错误行列、大整数、重复键、随机结构交叉验证、预览截断、输出大小 / 深度上限、取消、完整下载、粘贴转文件模式、移动端布局和 XSS 字符串安全展示。
-
-### 本机测量（非性能承诺）
-
-| 环境 / 用例 | 结果 |
-| --- | --- |
-| Node.js 22.14，约 50 MiB 输入，569,878 条记录 | 约 1.76 秒；输出 80.43 MiB，5,698,782 行；RSS 增量约 236 MiB。 |
-| 无界面 Chrome，约 24.60 MiB 输入，300,000 条记录 | 约 1.06 秒；输出 40.63 MiB，3,000,002 行；挂载 33 行 DOM；处理时主题切换可响应。 |
-
-耗时取决于设备、数据形状、缩进设置及浏览器。Node 基准不代表 UI 帧率，Chrome 自动化中的动画帧采样也不能代替完整的交互性能评估。
-
-## 代码结构
-
-```text
-index.html                   页面结构与使用指南
-src/styles.css               响应式样式与深浅主题
-src/app.js                   文件输入、状态管理、虚拟列表、复制下载
-src/json-worker.js           Worker 消息协议、任务隔离、结果缓存
-src/json-core.js             流式语法校验 / 格式化、Blob 输出与行索引
-scripts/serve.mjs            本地静态开发服务
-scripts/benchmark.mjs        大数据核心算法基准
-scripts/browser-smoke.mjs    零第三方依赖的 Chrome 端到端测试
-tests/json-core.test.mjs     核心正确性与边界测试
-```
+实现阶段 attempt 3 的正式复验记录为 20 项 XCTest（0 failures）和 87 条 AppKit/文件冒烟断言；首轮 CLT 工具链失败、后续源码诊断与 Xcode 正式复验是不同阶段，当前验证环境与结果、测试隔离、文件/ACL/恢复限制及尚未完成的人工作业见 [`docs/TESTING.md`](docs/TESTING.md)。冒烟启动真实 AppKit 窗口，需图形会话和可用的 `sandbox-exec`；它使用新建临时根和系统沙箱，不重设 `HOME`。这些实现阶段结果尚待文档后工作流复验和独立审核。
